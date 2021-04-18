@@ -6,23 +6,22 @@
 #include <vector>
 #include <exception>
 #include <iostream>
+#include <unordered_map>
+#include <queue>
 
 #include "myerror.h"
 
 
 using namespace std;
 
-struct Trans{
-    std::string from;
-    std::string alpha;
-    std::string to;
-};
 
 class FSM
 {
-    using Field = std::vector<std::string>;
-
-    std::vector<Field> fsm;
+    struct Trans{
+        std::string from;
+        std::string alpha;
+        std::string to;
+    };
 
     enum Attribute{
         STATE,
@@ -41,10 +40,17 @@ class FSM
         "trans=[",
     };
 
+    using Field = std::vector<std::string>;
+
+    std::vector<Field> fsm_raw;
+    std::vector <Trans> transitions;
+    std::unordered_map<std::string, std::vector<Trans>> fsm_graph;
+
+    const std::string EPS = "eps";
 public:
     explicit FSM (const std::vector<std::string> & input_str) noexcept(false){
         if (input_str.size()!=Attribute::SIZE) throw MyError(ErrorType::E0);
-        fsm.reserve(Attribute::SIZE);
+        fsm_raw.reserve(Attribute::SIZE);
 
         for(uint8_t i = 0; i < input_str.size(); i++)
         {
@@ -65,12 +71,38 @@ public:
             while (getline(field_stream, line1, ',')){
                 field.emplace_back(std::move(line1));
             }
-            fsm.emplace_back(std::move(field));
+            fsm_raw.emplace_back(std::move(field));
         }
-//        if (fsm[INITIAL].size() != 1) throw MyError(ErrorType::EX);
+        if (fsm_raw[INITIAL].size() > 1) throw MyError(ErrorType::E0);
+
+        for (const auto & trans_raw: fsm_raw[TRANS])
+        {
+            Trans trans_parse;
+            std::stringstream stream(trans_raw);
+
+            bool success = true;
+
+            success = success && getline(stream, trans_parse.from, '>');
+            success = success && getline(stream, trans_parse.alpha, '>');
+            success = success && getline(stream, trans_parse.to);
+
+            if (!success) throw MyError(ErrorType::E0);
+
+            fsm_graph[trans_parse.from].push_back(trans_parse);
+            transitions.push_back(trans_parse);
+        }
+        checkCondition();
     }
 private:
-
+    void checkCondition() noexcept(false);
+    static bool beIn(const std::string & item, const std::vector<std::string> & array);
+    bool isDeterm();
+    bool isNotDisjoint();
 };
+
+
+
+
+
 
 #endif // FSM_H
