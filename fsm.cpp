@@ -1,13 +1,19 @@
 #include "fsm.h"
 
 void FSM::checkCondition() noexcept(false){
+    //E0
+    for (const auto& str: fsm_raw[STATE])
+        if (!correctStr(str)) throw MyError(ErrorType::E1);
+
+    for (const auto& str: fsm_raw[ALPHABET])
+        if (!correctStr(str,{'_'})) throw MyError(ErrorType::E1);
+
     //E1
     std::string initial = fsm_raw[INITIAL].front();
     if (!beIn(initial, fsm_raw[STATE])) throw MyError(ErrorType::E1);
     for (const auto & state : fsm_raw[ACCEPTING])
-    {
         if (!beIn(state, fsm_raw[STATE])) throw MyError(ErrorType::E1);
-    }
+
     //E2
     if (!isNotDisjoint()) throw MyError(ErrorType::E2);
 
@@ -24,14 +30,6 @@ void FSM::checkCondition() noexcept(false){
     //E5
     if (!isDeterm()) throw MyError(ErrorType::E5);
 
-}
-
-bool FSM::beIn(const string &item, const std::vector<string> &array)
-{
-    for (const auto & state_name: array)
-        if (item == state_name)
-            return true;
-    return false;
 }
 
 bool FSM::isDeterm()
@@ -75,5 +73,23 @@ bool FSM::isNotDisjoint() {
         }
     }
     return used.size() == fsm_raw[STATE].size();
+}
+
+bool FSM::correctStr(const string &str, const std::vector<char> &extension){
+    for (const char& symb: str)
+    {
+        if (!isLetter(symb)) return false;
+        if (!isNumber(symb)) return false;
+        if (!beIn(symb,extension)) return false;
+    }
+    return true;
+}
+
+bool FSM::isLetter(const char ch) {
+    return ( ('a' <= ch) && (ch <= 'z') ) || ( ('A' <= ch) && (ch <= 'Z') );
+}
+
+bool FSM::isNumber(const char ch) {
+    return ('0' <= ch) && (ch <= '9');
 }
 

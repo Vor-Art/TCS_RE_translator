@@ -68,9 +68,8 @@ public:
             std::cout << line << std::endl;
             std::string line1;
             std::stringstream field_stream(line);
-            while (getline(field_stream, line1, ',')){
+            while (getline(field_stream, line1, ','))
                 field.emplace_back(std::move(line1));
-            }
             fsm_raw.emplace_back(std::move(field));
         }
         if (fsm_raw[INITIAL].size() > 1) throw MyError(ErrorType::E0);
@@ -95,13 +94,21 @@ public:
     }
 private:
     void checkCondition() noexcept(false);
-    static bool beIn(const std::string & item, const std::vector<std::string> & array);
+
+    template <typename T>
+    static bool beIn(const T & item, const std::vector<T>& array){
+        for (const T & state_name: array)
+            if (item == state_name)
+                return true;
+        return false;
+    }
+
     bool isDeterm();
     bool isNotDisjoint();
+    static bool correctStr(const std::string & str,const std::vector<char> & extension = {});
+    static bool isLetter(const char ch);
+    static bool isNumber(const char ch);
 };
-
-
-
 
 
 
