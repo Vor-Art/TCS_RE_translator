@@ -45,33 +45,35 @@ FSM::FSM(const std::vector<string> &input_str) noexcept(false){
 }
 
 void FSM::checkCondition() noexcept(false){
-    //E0
+
+    //E0: Input file is malformed
     for (const auto& str: fsm_raw[STATE])
         if (!correctStr(str)) throw MyError(ErrorType::E0);
 
     for (const auto& str: fsm_raw[ALPHABET])
         if (!correctStr(str,{'_'})) throw MyError(ErrorType::E0);
 
-    //E1
+    //E1: A state '%s' is not in the set of states
     std::string initial = fsm_raw[INITIAL].front();
-    if (!beIn(initial, fsm_raw[STATE])) throw MyError(ErrorType::E1);
-    for (const auto & state : fsm_raw[ACCEPTING])
-        if (!beIn(state, fsm_raw[STATE])) throw MyError(ErrorType::E1);
+    if (!beIn(initial, fsm_raw[STATE])) throw MyError(ErrorType::E1, initial);
 
-    //E2
+    for (const auto & state : fsm_raw[ACCEPTING])
+        if (!beIn(state, fsm_raw[STATE])) throw MyError(ErrorType::E1, state);
+
+    //E2: Some states are disjoint
     if (!isNotDisjoint()) throw MyError(ErrorType::E2);
 
-    //E3
+    //E3: A transition '%s' is not represented in the alphabet
     for (const auto & [from,alpha,to] : transitions)
     {
-        if (!beIn(from, fsm_raw[STATE])) throw MyError(ErrorType::E1);
-        if (!beIn(alpha, fsm_raw[ALPHABET])) throw MyError(ErrorType::E3);
-        if (!beIn(to, fsm_raw[STATE])) throw MyError(ErrorType::E1);
+        if (!beIn(from, fsm_raw[STATE])) throw MyError(ErrorType::E1, from);
+        if (!beIn(alpha, fsm_raw[ALPHABET])) throw MyError(ErrorType::E3, alpha);
+        if (!beIn(to, fsm_raw[STATE])) throw MyError(ErrorType::E1, to);
     }
-    //E4
+    //E4: Initial state is not defined
     if (fsm_raw[INITIAL].empty()) throw MyError(ErrorType::E4);
 
-    //E5
+    //E5: FSA is nondeterministic
     if (!isDeterm()) throw MyError(ErrorType::E5);
 
 }
