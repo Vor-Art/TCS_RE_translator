@@ -18,6 +18,7 @@ DISTFILES += \
     output.txt
 
 HEADERS += \
+    combined_program \
     fsm.h \
     myerror.h \
     regexpr.h

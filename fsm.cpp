@@ -1,5 +1,6 @@
 ﻿#include "fsm.h"
 
+#include <unordered_set>
 
 FSM::FSM(const std::vector<string> &input_str) noexcept(false)
 {
@@ -113,19 +114,19 @@ void FSM::checkCondition() const noexcept(false)
 
 bool FSM::isDeterm() const
 {
-    for (const std::string & from_name: fsm_raw[STATE])
-    { // from every states
+    for (const std::string & from_name: fsm_raw[STATE]) //from every states
+    { //
         size_t indx_from = states_dictinary.at(from_name);
-        for (const auto& to_alphas: fsm_graph[indx_from] )
-        { // by all states
-            size_t n = to_alphas.size();
-            for (size_t i = 0; i < n; ++i)
-            { // check all alphas
-                if (to_alphas[i] == EPS) return false;  //empty transition
-                for (size_t j = i+1; j < n; ++j)
-                    if (to_alphas[i] == to_alphas[j]) return false; //equals transitions
+        std::unordered_set<std::string> used;
+
+        for (const auto& to_alphas: fsm_graph[indx_from] ) // by all states
+
+            for (const auto& alpha : to_alphas)
+            {
+                if (alpha == EPS) return false;  //empty transition
+                if (used.count(alpha)) return false; //equal transition
+                used.insert(alpha);
             }
-        }
     }
     return true;
 }

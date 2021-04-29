@@ -13,7 +13,7 @@
 int main()
 {
 
-    std::string path = "/home/vorart/workspace/qt projects/TCS_RE_translator/input0.txt";
+    std::string path = "/home/vorart/workspace/qt projects/TCS_RE_translator/input1.txt";
 
     std::vector<std::string> input_str;
     input_str.reserve(FSM::Attribute::SIZE);

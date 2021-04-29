@@ -1,0 +1,484 @@
+#include <iostream>
+#include <string>
+#include <fstream>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <sstream>
+
+#ifndef FSM_H
+#define FSM_H
+
+#include <string>
+#include <sstream>
+#include <vector>
+#include <exception>
+#include <iostream>
+#include <unordered_map>
+#include <unordered_set>
+#include <queue>
+
+#ifndef MYERROR_H
+#define MYERROR_H
+#include <string>
+#include <stdexcept>
+#include <memory>
+enum class ErrorType
+{
+    E0,
+    E1,
+    E2,
+    E3,
+    E4,
+    E5,
+    SIZE
+};
+
+class MyError : public std::exception
+{
+    ErrorType err;
+
+    const std::string MyError_msg [static_cast<size_t> (ErrorType::SIZE)]
+    {
+        "E0: Input file is malformed",
+        "E1: A state '%s' is not in the set of states",
+        "E2: Some states are disjoint",
+        "E3: A transition '%s' is not represented in the alphabet",
+        "E4: Initial state is not defined",
+        "E5: FSA is nondeterministic"
+    };
+    std::string complement;
+public:
+
+    explicit MyError (ErrorType err_t, std::string complement = "")
+        : err(err_t), complement(std::move(complement))
+    {}
+
+    const char* what() const noexcept override
+    {
+        static std::string str;
+        str = MyError_msg[static_cast<size_t> (err)];
+        size_t n = str.find("%s");
+        if (!complement.empty() && n != std::string::npos)
+             str.replace(n,2,complement);
+        return str.c_str();
+    }
+
+};
+
+#endif // MYERROR_H
+
+
+
+struct FSM
+{
+    enum Attribute{
+        STATE,
+        ALPHABET,
+        INITIAL,
+        ACCEPTING,
+        TRANS,
+        SIZE
+    };
+
+
+    static const std::string EMPTY;
+    static const std::string EPS;
+    using Field = std::vector<std::string>;
+    using Graph = std::vector<std::vector<Field>>;
+
+private:
+    struct Trans{
+        std::string from;
+        std::string alpha;
+        std::string to;
+    };
+
+    const std::string Attribute_msg [Attribute::SIZE]{
+        "states=[",
+        "alpha=[",
+        "initial=[",
+        "accepting=[",
+        "trans=[",
+    };
+
+    std::vector<Field> fsm_raw;     //for intermediate calculations
+    std::vector<Trans> transitions; //for intermediate calculations
+    std::unordered_map<std::string, uint32_t> states_dictinary;
+//    std::unordered_map<std::string, uint32_t> alphabet_dictinary;
+    Graph fsm_graph;
+
+public:
+    explicit FSM (const std::vector<std::string> &input_str) noexcept(false);
+    const Graph &getGraph() const;
+    std::vector<uint32_t> getAccepting() const;
+    uint32_t getInitial() const;
+private:
+    void fillFsmRaw(const std::vector<std::string> &input_str);
+    void fillDictionary();
+    void initGraph(size_t N);
+    void fillGraph();
+    void checkCondition() const noexcept(false);
+    bool isDeterm()       const;
+    bool isNotDisjoint()  const;
+    template <typename T>
+    static bool beIn(const T & item, const std::vector<T>& array);
+    static bool correctStr(const std::string & str,const std::vector<char> & extension = {});
+    static bool isLetter(char ch);
+    static bool isNumber(char ch);
+};
+const std::string FSM::EMPTY = "{}";
+const std::string FSM::EPS = "eps";
+
+template <typename T>
+bool FSM::beIn(const T &item, const std::vector<T> &array){
+    for (const T & state_name: array)
+        if (item == state_name)
+            return true;
+    return false;
+}
+
+
+
+#endif // FSM_H
+
+
+
+FSM::FSM(const std::vector<std::string> &input_str) noexcept(false)
+{
+    if (input_str.size()!=Attribute::SIZE) throw MyError(ErrorType::E0);
+
+    fillFsmRaw(input_str);
+    fillDictionary();
+    fillGraph();
+    checkCondition();
+}
+
+
+
+void FSM::fillFsmRaw(const std::vector<std::string> &input_str)
+{
+    fsm_raw.reserve(Attribute::SIZE);
+    for(size_t i = 0; i < input_str.size(); i++)
+    {
+        Field field;
+        auto pos1 = input_str[i].find(Attribute_msg[i]);
+        if (pos1 == std::string::npos || pos1 != 0) throw MyError(ErrorType::E0);
+
+        auto pos2 = input_str[i].find(']');
+        if (pos2 == std::string::npos || pos2+1 != input_str[i].size()) throw MyError(ErrorType::E0);
+
+        auto s =input_str[i].begin();
+        auto f =input_str[i].end();
+
+        std::string line(s+Attribute_msg[i].size(),f-1);
+        std::stringstream field_stream(line);
+        std::string line1;
+        while (getline(field_stream, line1, ','))
+            field.emplace_back(std::move(line1));
+        fsm_raw.emplace_back(std::move(field));
+    }
+}
+
+void FSM::fillDictionary()
+{
+    states_dictinary.reserve(fsm_raw[STATE].size());
+    for (const auto& state_name: fsm_raw[STATE])
+        states_dictinary.emplace(state_name, states_dictinary.size());
+
+//    alphabet_dictinary.reserve(fsm_raw[ALPHABET].size());
+//    for (const auto& alpha_name: fsm_raw[ALPHABET])
+//            alphabet_dictinary.emplace(alpha_name, alphabet_dictinary.size());
+}
+void FSM::initGraph(size_t N)
+{
+    fsm_graph.resize(N, std::vector<Field>(N));
+}
+
+void FSM::fillGraph()
+{
+    initGraph(fsm_raw[STATE].size());
+    transitions.reserve(fsm_raw[TRANS].size());
+    for (const auto & trans_raw: fsm_raw[TRANS])
+    {
+        Trans trans_parse;
+        std::stringstream stream(trans_raw);
+
+        bool success = true;
+        success = success && getline(stream, trans_parse.from, '>');
+        success = success && getline(stream, trans_parse.alpha, '>');
+        success = success && getline(stream, trans_parse.to);
+        if (!success) throw MyError(ErrorType::E0);
+
+        size_t indx_from = states_dictinary.at(trans_parse.from);
+        size_t indx_to = states_dictinary.at(trans_parse.to);
+        fsm_graph[indx_from][indx_to].push_back( trans_parse.alpha );
+        transitions.push_back(trans_parse);
+    }
+}
+
+void FSM::checkCondition() const noexcept(false)
+{
+
+    //E0: Input file is malformed
+    if (fsm_raw[INITIAL].size() > 1) throw MyError(ErrorType::E0);
+
+    for (const auto& str: fsm_raw[STATE])
+        if (!correctStr(str)) throw MyError(ErrorType::E0);
+
+    for (const auto& str: fsm_raw[ALPHABET])
+        if (!correctStr(str,{'_'})) throw MyError(ErrorType::E0);
+
+    //E1: A state '%s' is not in the set of states
+    std::string initial = fsm_raw[INITIAL].front();
+    if (!beIn(initial, fsm_raw[STATE])) throw MyError(ErrorType::E1, initial);
+
+    for (const auto & state : fsm_raw[ACCEPTING])
+        if (!beIn(state, fsm_raw[STATE])) throw MyError(ErrorType::E1, state);
+
+    //E2: Some states are disjoint
+    if (!isNotDisjoint()) throw MyError(ErrorType::E2);
+
+    //E3: A transition '%s' is not represented in the alphabet
+    for (const auto & transition : transitions)
+    {
+        auto from = transition.from;
+        auto alpha = transition.alpha;
+        auto to = transition.to;
+        if (!beIn(from, fsm_raw[STATE])) throw MyError(ErrorType::E1, from);
+        if (!beIn(alpha, fsm_raw[ALPHABET])) throw MyError(ErrorType::E3, alpha);
+        if (!beIn(to, fsm_raw[STATE])) throw MyError(ErrorType::E1, to);
+    }
+    //E4: Initial state is not defined
+    if (fsm_raw[INITIAL].empty()) throw MyError(ErrorType::E4);
+
+    //E5: FSA is nondeterministic
+    if (!isDeterm()) throw MyError(ErrorType::E5);
+
+}
+
+bool FSM::isDeterm() const
+{
+    for (const std::string & from_name: fsm_raw[STATE]) //from every states
+    { //
+        size_t indx_from = states_dictinary.at(from_name);
+        std::unordered_set<std::string> used;
+
+        for (const auto& to_alphas: fsm_graph[indx_from] ) // by all states
+
+            for (const auto& alpha : to_alphas)
+            {
+                if (alpha == EPS) return false;  //empty transition
+                if (used.count(alpha)) return false; //equal transition
+                used.insert(alpha);
+            }
+    }
+    return true;
+}
+
+bool FSM::isNotDisjoint() const
+{
+    std::queue <std::string> q;
+    q.push(fsm_raw[INITIAL].front());
+    std::unordered_map<std::string, bool> used;
+    used[fsm_raw[INITIAL].front()] = true;
+
+    while (!q.empty()) {
+        std::string state = q.front();
+        q.pop();
+        for (auto & transitor: transitions) {
+
+            std::string from = transitor.from;
+            std::string to = transitor.to;
+
+            if (to != state && from != state) continue;
+            if (used.find(to) == used.end()) {
+                used[to] = true;
+                q.push (to);
+            }
+            if (used.find(from) == used.end()) {
+                used[from] = true;
+                q.push (from);
+            }
+        }
+    }
+    return used.size() == fsm_raw[STATE].size();
+}
+
+bool FSM::correctStr(const std::string &str, const std::vector<char> &extension)
+{
+    for (const char& symb: str)
+    {
+        if (isLetter(symb)) continue;
+        if (isNumber(symb)) continue;
+        if (beIn(symb,extension)) continue;
+        return false;
+    }
+    return true;
+}
+
+bool FSM::isLetter(const char ch)
+{
+    return ( ('a' <= ch) && (ch <= 'z') ) || ( ('A' <= ch) && (ch <= 'Z') );
+}
+
+bool FSM::isNumber(const char ch)
+{
+    return ('0' <= ch) && (ch <= '9');
+}
+
+const FSM::Graph &FSM::getGraph() const
+{
+    return fsm_graph;
+}
+
+std::vector<uint32_t> FSM::getAccepting() const
+{
+    std::vector<uint32_t> accepting;
+    accepting.reserve(fsm_raw[ACCEPTING].size());
+    for (const auto& acc_name: fsm_raw[ACCEPTING])
+        accepting.push_back(states_dictinary.at(acc_name));
+    return accepting;
+}
+
+uint32_t FSM::getInitial() const
+{
+    return states_dictinary.at(fsm_raw[INITIAL].front());
+}
+
+
+
+
+
+#ifndef REGEXPR_H
+#define REGEXPR_H
+#include <string>
+#include <vector>
+#include <unordered_map>
+
+class RegExpr
+{
+    struct Hash {
+        std::size_t operator()(const int32_t& index) const {
+            if (index < -1)
+                throw std::runtime_error("index for hash in out of range [-1,∞)");
+            return size_t(index + 1);
+        }
+    };
+    using Expression = std::string;
+    using Vector  = std::vector<Expression>;
+    using Layer = std::vector<Vector>;
+    using Matrix3D = std::unordered_map<int32_t,Layer,Hash>;
+    Matrix3D R;
+    const size_t N;
+
+    Expression expression;
+public:
+    RegExpr(const FSM &fsm);
+    const Expression &getExpression() const;
+
+private:
+    void initialStep(const FSM::Graph& graph);
+};
+
+#endif // REGEXPR_H
+
+
+#include <cassert>
+
+RegExpr::RegExpr(const FSM &fsm)
+    :N(fsm.getGraph().size())
+{
+    R.reserve(N+1);
+    for (int32_t k = -1; k < int32_t(N); ++k)
+    {
+        R[k].resize(N, Vector(N,""));
+    }
+    initialStep(fsm.getGraph());
+
+    // iteratively pumping our expressions
+    // steps 0..n
+    for(size_t k=0; k < N; k++)
+        for(size_t i=0; i < N; i++)
+            for(size_t j=0; j < N; j++)
+                R[k][i][j] = '('+R[k-1][i][k]+")("+R[k-1][k][k]+")*("+R[k-1][k][j]+")|("+R[k-1][i][j]+')';
+
+    uint32_t initial = fsm.getInitial();
+    for(uint32_t final: fsm.getAccepting())
+        expression += R[N-1][initial][final]+'|';
+    if (expression.empty())
+        expression += FSM::EMPTY + "|";
+    expression.pop_back();
+}
+
+
+
+void RegExpr::initialStep(const FSM::Graph& graph)
+{
+    const int32_t LAYER = -1;
+    for (size_t i = 0; i < N; ++i)
+    {
+        for (size_t j = 0; j < N; ++j)
+        {
+
+            for(const auto& alpha: graph[i][j])
+                R[LAYER][i][j] += alpha + "|";
+
+            if (i == j)
+                R[LAYER][i][j] += FSM::EPS + "|";
+
+            if (R[LAYER][i][j].empty()) // doesn't exist transition
+                R[LAYER][i][j] += FSM::EMPTY + "|";
+
+            assert( !R[LAYER][i][j].empty() && "expr must not be empty");
+            R[LAYER][i][j].pop_back();
+        }
+    }
+}
+
+const RegExpr::Expression &RegExpr::getExpression() const
+{
+    return expression;
+}
+
+
+
+
+
+
+
+int main()
+{
+    std::string path = "input.txt";
+
+    std::vector<std::string> input_str;
+    input_str.reserve(FSM::Attribute::SIZE);
+    std::string	line;
+    std::ifstream in(path); // opening the file for reading
+    assert(in.is_open() && "file is not found");
+    {
+        for (int i=0; getline(in, line,'\n'); i++)
+            input_str.emplace_back(std::move(line));
+    }
+    in.close();     // closing the file
+
+//    for (const auto& i: input_str)
+//        std::cout << i << std::endl;
+
+    std::stringstream stream;
+    try {
+        FSM fsm(input_str);
+        RegExpr regexpr(fsm);
+        stream << regexpr.getExpression()<< std::endl;
+    } catch (const MyError& err) {
+        stream << "Error:\n";
+        stream << err.what();
+    } /*catch (...) {
+        std::cout << "somthing go wrong";
+    }*/
+    std::ofstream fout("output.txt");
+    fout << stream.str();
+    fout.close();
+    return 0;
+}
+
