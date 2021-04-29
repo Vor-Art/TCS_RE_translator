@@ -6,6 +6,7 @@
 
 
 #include "fsm.h"
+#include "regexpr.h"
 #include "myerror.h"
 
 using namespace std;
@@ -35,6 +36,7 @@ int main()
 
     try {
         FSM fsm(input_str);
+        RegExpr regexpr(fsm);
     } catch (const MyError& err) {
         std::cout << "Error:\n\t";
         auto tmp = err.what();

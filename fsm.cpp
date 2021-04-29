@@ -1,9 +1,20 @@
 #include "fsm.h"
 
-FSM::FSM(const std::vector<string> &input_str) noexcept(false){
+FSM::FSM(const std::vector<string> &input_str) noexcept(false)
+{
     if (input_str.size()!=Attribute::SIZE) throw MyError(ErrorType::E0);
-    fsm_raw.reserve(Attribute::SIZE);
 
+    fillFsmRaw(input_str);
+    fillDictionary();
+    fillGraph();
+    checkCondition();
+}
+
+
+
+void FSM::fillFsmRaw(const std::vector<string> &input_str)
+{
+    fsm_raw.reserve(Attribute::SIZE);
     for(uint8_t i = 0; i < input_str.size(); i++)
     {
         Field field;
@@ -23,30 +34,51 @@ FSM::FSM(const std::vector<string> &input_str) noexcept(false){
             field.emplace_back(std::move(line1));
         fsm_raw.emplace_back(std::move(field));
     }
-    if (fsm_raw[INITIAL].size() > 1) throw MyError(ErrorType::E0);
+}
 
+void FSM::fillDictionary()
+{
+    states_dictinary.reserve(fsm_raw[STATE].size());
+    for (const auto& state_name: fsm_raw[STATE])
+        states_dictinary.emplace(state_name, states_dictinary.size());
+
+//    alphabet_dictinary.reserve(fsm_raw[ALPHABET].size());
+//    for (const auto& alpha_name: fsm_raw[ALPHABET])
+//            alphabet_dictinary.emplace(alpha_name, alphabet_dictinary.size());
+}
+void FSM::initGraph(size_t N)
+{
+    fsm_graph.resize(N, Field(N, EMPTY));
+}
+
+void FSM::fillGraph()
+{
+    initGraph(fsm_raw[STATE].size());
+    transitions.reserve(fsm_raw[TRANS].size());
     for (const auto & trans_raw: fsm_raw[TRANS])
     {
         Trans trans_parse;
         std::stringstream stream(trans_raw);
 
         bool success = true;
-
         success = success && getline(stream, trans_parse.from, '>');
         success = success && getline(stream, trans_parse.alpha, '>');
         success = success && getline(stream, trans_parse.to);
-
         if (!success) throw MyError(ErrorType::E0);
 
-        fsm_graph[trans_parse.from].push_back(trans_parse);
+        size_t indx_from = states_dictinary.at(trans_parse.from);
+        size_t indx_to = states_dictinary.at(trans_parse.to);
+        fsm_graph[indx_from][indx_to] = trans_parse.alpha;
         transitions.push_back(trans_parse);
     }
-    checkCondition();
 }
 
-void FSM::checkCondition() noexcept(false){
+void FSM::checkCondition() const noexcept(false)
+{
 
     //E0: Input file is malformed
+    if (fsm_raw[INITIAL].size() > 1) throw MyError(ErrorType::E0);
+
     for (const auto& str: fsm_raw[STATE])
         if (!correctStr(str)) throw MyError(ErrorType::E0);
 
@@ -78,22 +110,24 @@ void FSM::checkCondition() noexcept(false){
 
 }
 
-bool FSM::isDeterm()
+bool FSM::isDeterm() const
 {
-    for (const std::string & from: fsm_raw[STATE])
+    for (const std::string & from_name: fsm_raw[STATE])
     {
-        std::vector <Trans> trans = fsm_graph[from];
+        size_t indx_from = states_dictinary.at(from_name);
+        std::vector <std::string> trans = fsm_graph[indx_from];
         for (size_t i = 0; i < trans.size(); ++i)
         {
-            if (trans[i].alpha == EPS) return false;
+            if (trans[i] == EPS) return false;
             for (size_t j = i+1; j < trans.size(); ++j)
-                if (trans[i].alpha == trans[j].alpha) return false;
+                if (trans[i] == trans[j]) return false;
         }
     }
     return true;
 }
 
-bool FSM::isNotDisjoint() {
+bool FSM::isNotDisjoint() const
+{
     std::queue <std::string> q;
     q.push(fsm_raw[INITIAL].front());
     std::unordered_map<std::string, bool> used;
@@ -121,7 +155,8 @@ bool FSM::isNotDisjoint() {
     return used.size() == fsm_raw[STATE].size();
 }
 
-bool FSM::correctStr(const string &str, const std::vector<char> &extension){
+bool FSM::correctStr(const string &str, const std::vector<char> &extension)
+{
     for (const char& symb: str)
     {
         if (isLetter(symb)) continue;
@@ -132,11 +167,17 @@ bool FSM::correctStr(const string &str, const std::vector<char> &extension){
     return true;
 }
 
-bool FSM::isLetter(const char ch) {
+bool FSM::isLetter(const char ch)
+{
     return ( ('a' <= ch) && (ch <= 'z') ) || ( ('A' <= ch) && (ch <= 'Z') );
 }
 
-bool FSM::isNumber(const char ch) {
+bool FSM::isNumber(const char ch)
+{
     return ('0' <= ch) && (ch <= '9');
 }
+
+const FSM::Graph &FSM::getGraph() const { return fsm_graph;}
+
+
 

@@ -15,9 +15,8 @@
 using namespace std;
 
 
-class FSM
+struct FSM
 {
-public:
     enum Attribute{
         STATE,
         ALPHABET,
@@ -27,6 +26,12 @@ public:
         SIZE
     };
 
+
+    inline static const std::string EMPTY = "{}";
+    inline static const std::string EPS = "eps";
+    using Field = std::vector<std::string>;
+    using Graph = std::vector<std::vector<std::string>>;
+
 private:
     struct Trans{
         std::string from;
@@ -34,7 +39,7 @@ private:
         std::string to;
     };
 
-    const std::string Attribute_msg [Attribute::SIZE]{
+    inline static const std::string Attribute_msg [Attribute::SIZE]{
         "states=[",
         "alpha=[",
         "initial=[",
@@ -42,25 +47,31 @@ private:
         "trans=[",
     };
 
-    using Field = std::vector<std::string>;
+    std::vector<Field> fsm_raw;     //for intermediate calculations
+    std::vector<Trans> transitions; //for intermediate calculations
+    std::unordered_map<std::string, uint32_t> states_dictinary;
+//    std::unordered_map<std::string, uint32_t> alphabet_dictinary;
+    Graph fsm_graph;
 
-    std::vector <Field> fsm_raw;
-    std::vector <Trans> transitions;
-    std::unordered_map<std::string, std::vector<Trans>> fsm_graph;
-
-    const std::string EPS = "eps";
 public:
-    explicit FSM (const std::vector<std::string> & input_str) noexcept(false);
+    explicit FSM (const std::vector<std::string> &input_str) noexcept(false);
+    const Graph &getGraph() const;
 private:
+    void fillFsmRaw(const std::vector<std::string> &input_str);
+    void fillDictionary();
+    void initGraph(size_t N);
+    void fillGraph();
+    void checkCondition() const noexcept(false);
+    bool isDeterm()       const;
+    bool isNotDisjoint()  const;
     template <typename T>
     static bool beIn(const T & item, const std::vector<T>& array);
-    void checkCondition() noexcept(false);
-    bool isDeterm();
-    bool isNotDisjoint();
     static bool correctStr(const std::string & str,const std::vector<char> & extension = {});
     static bool isLetter(const char ch);
     static bool isNumber(const char ch);
 };
+
+
 
 template <typename T>
 bool FSM::beIn(const T &item, const std::vector<T> &array){
