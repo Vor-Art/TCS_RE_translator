@@ -1,4 +1,5 @@
-#include "fsm.h"
+﻿#include "fsm.h"
+
 
 FSM::FSM(const std::vector<string> &input_str) noexcept(false)
 {
@@ -48,7 +49,7 @@ void FSM::fillDictionary()
 }
 void FSM::initGraph(size_t N)
 {
-    fsm_graph.resize(N, Field(N, EMPTY));
+    fsm_graph.resize(N, std::vector<Field>(N));
 }
 
 void FSM::fillGraph()
@@ -68,7 +69,7 @@ void FSM::fillGraph()
 
         size_t indx_from = states_dictinary.at(trans_parse.from);
         size_t indx_to = states_dictinary.at(trans_parse.to);
-        fsm_graph[indx_from][indx_to] = trans_parse.alpha;
+        fsm_graph[indx_from][indx_to].push_back( trans_parse.alpha );
         transitions.push_back(trans_parse);
     }
 }
@@ -113,14 +114,17 @@ void FSM::checkCondition() const noexcept(false)
 bool FSM::isDeterm() const
 {
     for (const std::string & from_name: fsm_raw[STATE])
-    {
+    { // from every states
         size_t indx_from = states_dictinary.at(from_name);
-        std::vector <std::string> trans = fsm_graph[indx_from];
-        for (size_t i = 0; i < trans.size(); ++i)
-        {
-            if (trans[i] == EPS) return false;
-            for (size_t j = i+1; j < trans.size(); ++j)
-                if (trans[i] == trans[j]) return false;
+        for (const auto& to_alphas: fsm_graph[indx_from] )
+        { // by all states
+            size_t n = to_alphas.size();
+            for (size_t i = 0; i < n; ++i)
+            { // check all alphas
+                if (to_alphas[i] == EPS) return false;  //empty transition
+                for (size_t j = i+1; j < n; ++j)
+                    if (to_alphas[i] == to_alphas[j]) return false; //equals transitions
+            }
         }
     }
     return true;
@@ -177,7 +181,24 @@ bool FSM::isNumber(const char ch)
     return ('0' <= ch) && (ch <= '9');
 }
 
-const FSM::Graph &FSM::getGraph() const { return fsm_graph;}
+const FSM::Graph &FSM::getGraph() const
+{
+    return fsm_graph;
+}
+
+std::vector<uint32_t> FSM::getAccepting() const
+{
+    std::vector<uint32_t> accepting;
+    accepting.reserve(fsm_raw[ACCEPTING].size());
+    for (const auto& acc_name: fsm_raw[ACCEPTING])
+        accepting.push_back(states_dictinary.at(acc_name));
+    return accepting;
+}
+
+uint32_t FSM::getInitial() const
+{
+    return states_dictinary.at(fsm_raw[INITIAL].front());
+}
 
 
 

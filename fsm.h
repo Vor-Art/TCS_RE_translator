@@ -30,7 +30,7 @@ struct FSM
     inline static const std::string EMPTY = "{}";
     inline static const std::string EPS = "eps";
     using Field = std::vector<std::string>;
-    using Graph = std::vector<std::vector<std::string>>;
+    using Graph = std::vector<std::vector<Field>>;
 
 private:
     struct Trans{
@@ -56,6 +56,8 @@ private:
 public:
     explicit FSM (const std::vector<std::string> &input_str) noexcept(false);
     const Graph &getGraph() const;
+    std::vector<uint32_t> getAccepting() const;
+    uint32_t getInitial() const;
 private:
     void fillFsmRaw(const std::vector<std::string> &input_str);
     void fillDictionary();

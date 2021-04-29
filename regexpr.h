@@ -21,8 +21,12 @@ class RegExpr
     using Matrix3D = std::unordered_map<int32_t,Layer,Hash>;
     Matrix3D R;
     const size_t N;
+
+    Expression expression;
 public:
     RegExpr(const FSM &fsm);
+    const Expression &getExpression() const;
+
 private:
     void initialStep(const FSM::Graph& graph);
 };

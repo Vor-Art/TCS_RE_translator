@@ -3,22 +3,17 @@
 #include <fstream>
 #include <vector>
 #include <cassert>
-
+#include <sstream>
 
 #include "fsm.h"
 #include "regexpr.h"
 #include "myerror.h"
 
-using namespace std;
-
-
-
-
 
 int main()
 {
 
-    std::string path = "/home/vorart/workspace/qt projects/TCS_RE_translator/input2.txt";
+    std::string path = "/home/vorart/workspace/qt projects/TCS_RE_translator/input0.txt";
 
     std::vector<std::string> input_str;
     input_str.reserve(FSM::Attribute::SIZE);
@@ -32,16 +27,21 @@ int main()
     in.close();     // closing the file
 
     for (const auto& i: input_str)
-        cout << i << endl;
+        std::cout << i << endl;
 
+    std::stringstream stream;
     try {
         FSM fsm(input_str);
         RegExpr regexpr(fsm);
+        stream << regexpr.getExpression()<< std::endl;
     } catch (const MyError& err) {
         std::cout << "Error:\n\t";
-        auto tmp = err.what();
-        std::cout << tmp << std::endl;
+        std::cout << err.what() << std::endl;
+    } catch (...) {
+        std::cout << "somthing go wrong";
     }
-
+    std::ofstream fout("/home/vorart/workspace/qt projects/TCS_RE_translator/output.txt");
+    fout << stream.str();
+    fout.close();
     return 0;
 }

@@ -14,7 +14,8 @@ DISTFILES += \
     input.txt \
     input0.txt \
     input1.txt \
-    input2.txt
+    input2.txt \
+    output.txt
 
 HEADERS += \
     fsm.h \
